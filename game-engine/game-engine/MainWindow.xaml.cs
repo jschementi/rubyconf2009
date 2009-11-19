@@ -34,6 +34,7 @@ namespace GameEngine {
         private bool _isCtrlPressed;
         private bool _isOutputRedirected;
         private TextBoxBuffer _textboxBuffer;
+        private Brush _tempBrush;
 
         // callback fields
         private readonly Timer _timer = new Timer();
@@ -54,9 +55,30 @@ namespace GameEngine {
         public TextBox Code { get { return _code; } }
         public StackPanel CanvasControls { get { return _canvasControls; } }
         public StackPanel OutputControls { get { return _outputControls; } }
+        public Rectangle EditorToggle { get { return _editorToggle; } }
 
         public MainWindow() {
             InitializeComponent();
+
+            /*
+            _editorToggle.MouseDown += (s, e) => {
+                var column = ((Grid)this.Content).ColumnDefinitions[2];
+                if (column.Width == new GridLength(0)) {
+                    column.Width = new GridLength(9, GridUnitType.Star);
+                } else {
+                    column.Width = new GridLength(0);
+                }
+            };
+            _editorToggle.MouseEnter += (s, e) => {
+                _tempBrush = _editorToggle.Fill;
+                _editorToggle.Fill = new SolidColorBrush(Colors.Red);
+            };
+            _editorToggle.MouseLeave += (s, e) => {
+                _editorToggle.Fill = _tempBrush;
+            };
+            _editorToggle.Fill = ((Grid) this.Content).Background;
+            */
+
             InitializeHosting();
 #if HOSTING
             var engine = Runtime.GetEngine("Ruby");
