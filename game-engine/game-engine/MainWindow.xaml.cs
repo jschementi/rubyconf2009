@@ -14,18 +14,17 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Timers;
+
 #if HOSTING
 using Microsoft.Scripting.Hosting;
-using System.Timers;
 #endif
 
-namespace GameEngine
-{
+namespace GameEngine {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
-    {
+    public partial class MainWindow : Window {
 #if HOSTING
         // Hosting fields
         public ScriptRuntime Runtime { get; private set; }
@@ -40,16 +39,28 @@ namespace GameEngine
         private readonly Timer _timer = new Timer();
         private bool _areCallbacksRegistered;
         private Action _callback;
-        private Func<object, IObjectUpdater> _trackerMaker;
+        private Func<object,
+#if CLR2
+            IObjectUpdater
+#else
+            dynamic
+#endif
+            > _trackerMaker;
         private static DependencyProperty TrackerProperty = DependencyProperty.RegisterAttached("TrackerProperty", typeof(object), typeof(UIElement));
 
-        public MainWindow()
-        {
+        // UI fields
+        public TextBox History { get { return _history; } }
+        public TextBox Output { get { return _output; } }
+        public TextBox Code { get { return _code; } }
+        public StackPanel CanvasControls { get { return _canvasControls; } }
+        public StackPanel OutputControls { get { return _outputControls; } }
+
+        public MainWindow() {
             InitializeComponent();
-
             InitializeHosting();
-
+#if HOSTING
             var engine = Runtime.GetEngine("Ruby");
+#endif
 
             // When Ctrl-Enter is pressed, run the code:
             _code.KeyDown += (sender, args) => {
@@ -68,15 +79,15 @@ namespace GameEngine
                             RegisterCallbacks();
                             _areCallbacksRegistered = true;
                         }
+                        
                         object result = engine.Execute(_code.Text, CodeScope);
-                        if (result != null) {
-                            CodeScope.SetVariable("_", result);
-                            string repr = engine.Execute("puts _.inspect", CodeScope);
-                            if (repr != null)
-                                _textboxBuffer.write("=> " + repr + "\n");
-                        }
-                    }
-                    catch (Exception ex) {
+                        
+                        _history.AppendText(_code.Text);
+                        CodeScope.SetVariable("_", result);
+                        string repr = engine.Execute<string>("_.inspect", CodeScope);
+                        _textboxBuffer.write("=> " + repr + "\n");
+                        _history.AppendText("\n# => " + repr + "\n");
+                    } catch (Exception ex) {
                         string formattedEx = engine.GetService<ExceptionOperations>().FormatException(ex);
                         if (_isOutputRedirected) {
                             _textboxBuffer.write(formattedEx);
@@ -112,13 +123,19 @@ namespace GameEngine
                         }
                         if (_trackerMaker != null) {
                             foreach (UIElement element in _canvas.Children) {
+#if CLR2
+                                IObjectUpdater tracker = element.GetValue(TrackerProperty) as IObjectUpdater;
+#else
                                 dynamic tracker = element.GetValue(TrackerProperty);
+#endif
+
                                 if (tracker == null && _trackerMaker != null) {
                                     tracker = _trackerMaker(element);
                                     element.SetValue(TrackerProperty, tracker);
                                 }
                                 if (tracker != null) {
-                                    tracker.update(element);
+                                    tracker.Update(element);
+                                    // IronRuby.Ruby.GetEngine(Runtime).Operations.InvokeMember(tracker, "update", element);
                                 }
                             }
                         }
@@ -151,21 +168,22 @@ namespace GameEngine
             CodeScope.SetVariable("canvas", _canvas);
             CodeScope.SetVariable("window", this);
 #else
-            dynamic codeScope = _codeScope;
-            codeScope.Application = this;
+            dynamic codeScope = CodeScope;
+            codeScope.window = this;
+            codeScope.canvas = _canvas;
 #endif
 #endif
         }
 
+#if HOSTING
         // Redirects Ruby's output to the _output TextBox
         private void RedirectOutput(ScriptEngine engine) {
             Action redirect = () => {
-#if HOSTING
+
                 var outputScope = engine.CreateScope();
                 _textboxBuffer = new TextBoxBuffer(_output);
                 outputScope.SetVariable("__output__", _textboxBuffer);
                 engine.Execute("$stdout = __output__", outputScope);
-#endif
             };
             if (_output.IsLoaded) {
                 redirect();
@@ -173,6 +191,7 @@ namespace GameEngine
                 _output.Loaded += (sender, args) => redirect();
             }
         }
+#endif
     }
 
     // Simple TextBox Buffer class

@@ -1,31 +1,37 @@
-include System::Windows::Controls
-include System::Windows::Shapes
-include System::Windows::Media
+require 'wpf'
+
 include GameEngine 
 
-class System::Windows::Media::Brushes
-  def self.random
-    send colors[rand(colors.size)]
+$window = window
+
+def cls
+  canvas.children.clear
+end
+
+class << window.canvas_controls
+  def show
+    $window.content.row_definitions[0].height = System::Windows::GridLength.new(35)
   end
 
-  def self.colors
-    public_methods(false) - Object.public_methods - ['rand', 'colors']
+  def hide
+    $window.content.row_definitions[0].height = System::Windows::GridLength.new(12)
   end
 end
 
 $offset = 20
 $rect_size = 20
 
-def random_square
+def rand_square
   rect = Rectangle.new
   rect.width, rect.height, rect.fill = $rect_size, $rect_size, Brushes.random
   canvas.children.add rect
   Canvas.set_left rect, rand(canvas.actual_width - $offset)
   Canvas.set_top  rect, rand(canvas.actual_height - $offset)
+  rect
 end
 
-def random_squares(count = 100)
-  count.times{ |i| random_square }
+def rand_squares(count = 100)
+  count.times{ |i| rand_square }
 end
 
 $dim = [canvas.actual_width - $offset, canvas.actual_height - $offset].min / 2
@@ -76,3 +82,19 @@ end
 def bounce target
   Tracker.new rand(10) - 5, rand(10) - 5
 end
+
+def drag obj
+  require 'dragger'
+  d = Dragger.new(obj, canvas)
+  d.enable!
+end
+
+def clock time = Time.now
+  require 'clock'
+  clock = Clock.new canvas
+  clock.load('clock.xaml')
+  canvas.children.add clock.canvas
+  clock.set_hands time
+  clock
+end
+
