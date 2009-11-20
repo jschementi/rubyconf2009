@@ -15,15 +15,13 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Timers;
+using System.IO;
 
 #if HOSTING
 using Microsoft.Scripting.Hosting;
 #endif
 
 namespace GameEngine {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window {
 #if HOSTING
         // Hosting fields
@@ -60,31 +58,13 @@ namespace GameEngine {
         public MainWindow() {
             InitializeComponent();
 
-            /*
-            _editorToggle.MouseDown += (s, e) => {
-                var column = ((Grid)this.Content).ColumnDefinitions[2];
-                if (column.Width == new GridLength(0)) {
-                    column.Width = new GridLength(9, GridUnitType.Star);
-                } else {
-                    column.Width = new GridLength(0);
-                }
-            };
-            _editorToggle.MouseEnter += (s, e) => {
-                _tempBrush = _editorToggle.Fill;
-                _editorToggle.Fill = new SolidColorBrush(Colors.Red);
-            };
-            _editorToggle.MouseLeave += (s, e) => {
-                _editorToggle.Fill = _tempBrush;
-            };
-            _editorToggle.Fill = ((Grid) this.Content).Background;
-            */
-
             InitializeHosting();
 #if HOSTING
+            // Get the Ruby engine by name.
             var engine = Runtime.GetEngine("Ruby");
 #endif
 
-            // When Ctrl-Enter is pressed, run the code:
+            // When Ctrl-Enter is pressed, run the script code
             _code.KeyDown += (sender, args) => {
                 if (args.Key == Key.LeftCtrl || args.Key == Key.RightCtrl) {
                     _isCtrlPressed = true;
@@ -93,23 +73,31 @@ namespace GameEngine {
                 if (_isCtrlPressed && args.Key == Key.Enter) {
 #if HOSTING
                     try {
+                        // Redirects all script output to the output textbox.
                         if (!_isOutputRedirected) {
                             RedirectOutput(engine);
                             _isOutputRedirected = true;
                         }
+
+                        // Registers the callbacks that are fired 30 times a second.
                         if (!_areCallbacksRegistered) {
                             RegisterCallbacks();
                             _areCallbacksRegistered = true;
                         }
                         
+                        // Executes the script code against the shared scope to persist
+                        // variables between executions.
                         object result = engine.Execute(_code.Text, CodeScope);
                         
+                        // Write the code and results to the history and output areas
                         _history.AppendText(_code.Text);
                         CodeScope.SetVariable("_", result);
                         string repr = engine.Execute<string>("_.inspect", CodeScope);
                         _textboxBuffer.write("=> " + repr + "\n");
                         _history.AppendText("\n# => " + repr + "\n");
+
                     } catch (Exception ex) {
+
                         string formattedEx = engine.GetService<ExceptionOperations>().FormatException(ex);
                         if (_isOutputRedirected) {
                             _textboxBuffer.write(formattedEx);
@@ -118,12 +106,27 @@ namespace GameEngine {
                         }
                     }
 
+                    // "callback" is called 30-times a second without any arguments.
                     Action callbackAction = null;
                     CodeScope.TryGetVariable<Action>("callback", out callbackAction);
                     _callback = callbackAction;
 
-                    Func<object, IObjectUpdater> tracker = null;
-                    CodeScope.TryGetVariable<Func<object, IObjectUpdater>>("tracker", out tracker);
+                    // "tracker" is called 30-times a second with one "object" argument,
+                    // is expected to return a IObjectUpdater
+                    Func<object, 
+#if CLR2
+                        IObjectUpdater
+#else
+                        dynamic
+#endif
+                        > tracker = null;
+                    CodeScope.TryGetVariable<Func<object, 
+#if CLR2
+                        IObjectUpdater
+#else
+                        dynamic
+#endif
+                        >>("tracker", out tracker);
                     _trackerMaker = tracker;
 #endif
                 }
@@ -133,6 +136,15 @@ namespace GameEngine {
                     _isCtrlPressed = false;
                 }
             };
+
+#if HOSTING
+            engine.CreateScriptSourceFromString(File.ReadAllText("../../../features/demo.rb")).Execute(CodeScope);
+            Action setup = null;
+            CodeScope.TryGetVariable<Action>("setup_interface", out setup);
+            if (setup != null) {
+                setup();
+            }
+#endif
         }
 
         private void RegisterCallbacks() {
@@ -156,7 +168,7 @@ namespace GameEngine {
                                     element.SetValue(TrackerProperty, tracker);
                                 }
                                 if (tracker != null) {
-                                    tracker.Update(element);
+                                    tracker.update(element);
                                     // IronRuby.Ruby.GetEngine(Runtime).Operations.InvokeMember(tracker, "update", element);
                                 }
                             }
@@ -230,8 +242,10 @@ namespace GameEngine {
         }
     }
 
+#if CLR2
     // Implement this interface, and the Update method gets called 30 times a second
     public interface IObjectUpdater {
-        void Update(object target);
+        void update(object target);
     }
+#endif
 }

@@ -7,13 +7,9 @@
 <input id="say_hello" type="button" value="Say, Hello!" />
 
 <script type="text/ruby">
-  def onclick(s,e)
+  document.say_hello.onclick do |s,e|
     window.alert "Hello, World!"
   end
-  document.say_hello.attach_event(
-    'onclick', 
-    System::EventHandler[System::Windows::Browser::HtmlEventArgs].new(method(:onclick))
-  )
 </script>
 
 </body>
