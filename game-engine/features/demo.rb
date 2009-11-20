@@ -70,7 +70,7 @@ def enable_toggle_editor
   window.editor_toggle.mouse_down do |s, e|
     column = window.content.column_definitions[2]
     column.width = (column.width == GridLength.new(0)) ?
-      GridLength.new(9, GridUnitType.star) :
+      GridLength.new(10, GridUnitType.star) :
       GridLength.new(0)
   end
   window.editor_toggle.mouse_enter do |s, e|
