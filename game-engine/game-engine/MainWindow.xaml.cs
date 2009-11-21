@@ -32,7 +32,6 @@ namespace GameEngine {
         private bool _isCtrlPressed;
         private bool _isOutputRedirected;
         private TextBoxBuffer _textboxBuffer;
-        private Brush _tempBrush;
 
         // callback fields
         private readonly Timer _timer = new Timer();

@@ -100,6 +100,22 @@ def clock time = Time.now
 end
 
 
+#
+# Adds a bunch of buttons to fill out the interface
+#
+def add_rest_of_buttons
+  as_button "100 Random Squares", window.canvas_controls do |s,e|
+    rand_squares
+  end
+  as_button "Large Circle", window.canvas_controls do |s,e|
+    large_circle
+  end
+  as_button "Clear", window.output_controls do |s,e|
+    window.output.text = ''
+  end
+end
+
+
 
 
 #
