@@ -18,7 +18,9 @@ using System.Timers;
 using System.IO;
 
 #if HOSTING
+using Microsoft.Scripting;
 using Microsoft.Scripting.Hosting;
+using IronRuby.Builtins;
 #endif
 
 namespace GameEngine {
@@ -26,7 +28,14 @@ namespace GameEngine {
 #if HOSTING
         // Hosting fields
         public ScriptRuntime Runtime { get; private set; }
-        public ScriptScope CodeScope { get; private set; }
+        public 
+#if CLR2
+            ScriptScope
+#else
+            dynamic
+#endif
+            CodeScope { get; private set; }
+        private ScriptEngine _currentEngine;
 #endif
         // IDE fields
         private bool _isCtrlPressed;
@@ -52,97 +61,119 @@ namespace GameEngine {
         public TextBox Code { get { return _code; } }
         public StackPanel CanvasControls { get { return _canvasControls; } }
         public StackPanel OutputControls { get { return _outputControls; } }
-        public Rectangle EditorToggle { get { return _editorToggle; } }
+        public GridSplitter EditorToggle { get { return _editorToggle; } }
 
         public MainWindow() {
             InitializeComponent();
 
-            InitializeHosting();
+            this.Loaded += (s,e) => {
+                InitializeHosting();
 #if HOSTING
-            // Get the Ruby engine by name.
-            var engine = Runtime.GetEngine("Ruby");
+                // Get the Ruby engine by name.
+                _currentEngine = Runtime.GetEngine("Ruby");
 #endif
 
-            // When Ctrl-Enter is pressed, run the script code
-            _code.KeyDown += (sender, args) => {
-                if (args.Key == Key.LeftCtrl || args.Key == Key.RightCtrl) {
-                    _isCtrlPressed = true;
-                }
+                // When Ctrl-Enter is pressed, run the script code
+                _code.KeyDown += (sender, args) => {
+                    if (args.Key == Key.LeftCtrl || args.Key == Key.RightCtrl)
+                        _isCtrlPressed = true;
 
-                if (_isCtrlPressed && args.Key == Key.Enter) {
+                    if (_isCtrlPressed && args.Key == Key.Enter) {
 #if HOSTING
-                    try {
-                        // Redirects all script output to the output textbox.
-                        if (!_isOutputRedirected) {
-                            RedirectOutput(engine);
-                            _isOutputRedirected = true;
-                        }
-
-                        // Registers the callbacks that are fired 30 times a second.
-                        if (!_areCallbacksRegistered) {
-                            RegisterCallbacks();
-                            _areCallbacksRegistered = true;
-                        }
-                        
-                        // Executes the script code against the shared scope to persist
-                        // variables between executions.
-                        object result = engine.Execute(_code.Text, CodeScope);
-                        
-                        // Write the code and results to the history and output areas
-                        _history.AppendText(_code.Text);
-                        CodeScope.SetVariable("_", result);
-                        string repr = engine.Execute<string>("_.inspect", CodeScope);
-                        _textboxBuffer.write("=> " + repr + "\n");
-                        _history.AppendText("\n# => " + repr + "\n");
-
-                    } catch (Exception ex) {
-
-                        string formattedEx = engine.GetService<ExceptionOperations>().FormatException(ex);
-                        if (_isOutputRedirected) {
-                            _textboxBuffer.write(formattedEx);
-                        } else {
-                            System.Windows.MessageBox.Show(formattedEx);
-                        }
+                        RunCode(_code);
                     }
-
-                    // "callback" is called 30-times a second without any arguments.
-                    Action callbackAction = null;
-                    CodeScope.TryGetVariable<Action>("callback", out callbackAction);
-                    _callback = callbackAction;
-
-                    // "tracker" is called 30-times a second with one "object" argument,
-                    // is expected to return a IObjectUpdater
-                    Func<object, 
-#if CLR2
-                        IObjectUpdater
-#else
-                        dynamic
-#endif
-                        > tracker = null;
-                    CodeScope.TryGetVariable<Func<object, 
-#if CLR2
-                        IObjectUpdater
-#else
-                        dynamic
-#endif
-                        >>("tracker", out tracker);
-                    _trackerMaker = tracker;
-#endif
-                }
-            };
-            _code.KeyUp += (sender, args) => {
-                if (args.Key == Key.LeftCtrl || args.Key == Key.RightCtrl) {
-                    _isCtrlPressed = false;
-                }
-            };
+                };
+                _code.KeyUp += (sender, args) => {
+                    if (args.Key == Key.LeftCtrl || args.Key == Key.RightCtrl)
+                        _isCtrlPressed = false;
+                };
 
 #if HOSTING
-            engine.CreateScriptSourceFromString(File.ReadAllText("../../../features/demo.rb")).Execute(CodeScope);
-            Action setup = null;
-            CodeScope.TryGetVariable<Action>("setup_interface", out setup);
-            if (setup != null) {
-                setup();
+                string path = "../../../features/basic.rb";
+                string code = File.ReadAllText(path);
+                RunCode(code, path);
+#if CLR2
+                Action setup = null;
+                CodeScope.TryGetVariable<Action>("setup", out setup);
+                if (setup != null) setup();
+#else
+                CodeScope.setup();
+#endif
+#endif
+            };
+        }
+
+        public void RunCode(TextBox t) {
+            string code = t.SelectionLength > 0 ? t.SelectedText : t.Text;
+            RunCode(code);
+        }
+
+        public void RunCode(string codeToRun) {
+            RunCode(codeToRun, null);
+        }
+
+        public void RunCode(string codeToRun, string path) {
+            try {
+                // Redirects all script output to the output textbox.
+                if (!_isOutputRedirected) {
+                    RedirectOutput(_currentEngine);
+                    _isOutputRedirected = true;
+                }
+
+                // Registers the callbacks that are fired 30 times a second.
+                if (!_areCallbacksRegistered) {
+                    RegisterCallbacks();
+                    _areCallbacksRegistered = true;
+                }
+
+                // Executes the script code against the shared scope to persist
+                // variables between executions.
+                object result = null;
+                if (path == null)
+                    result = _currentEngine.Execute(codeToRun, CodeScope);
+                else
+                    result = _currentEngine.CreateScriptSourceFromString(codeToRun, path, SourceCodeKind.File).Execute(CodeScope);
+
+                // Write the code and results to the history and output areas
+                _history.AppendText(codeToRun);
+#if CLR2
+                CodeScope.SetVariable("_", result);
+#else
+                        CodeScope._ = result;
+#endif
+                string repr = _currentEngine.Execute<string>("_.inspect", CodeScope);
+                _textboxBuffer.write("=> " + repr + "\n");
+                _history.AppendText("\n# => " + repr + "\n");
+            } catch (Exception ex) {
+                string formattedEx = _currentEngine.GetService<ExceptionOperations>().FormatException(ex);
+                if (_isOutputRedirected)
+                    this.Dispatcher.BeginInvoke((Action)(() => _textboxBuffer.write(formattedEx)));
+                else
+                    System.Windows.MessageBox.Show(formattedEx);
             }
+
+            // "callback" is called 30-times a second without any arguments.
+            Action callbackAction = null;
+            CodeScope.TryGetVariable<Action>("callback", out callbackAction);
+            _callback = callbackAction;
+
+            // "tracker" is called 30-times a second with one "object" argument,
+            // is expected to return a IObjectUpdater
+            Func<object,
+#if CLR2
+                        IObjectUpdater
+#else
+                        dynamic
+#endif
+                > tracker = null;
+            CodeScope.TryGetVariable<Func<object,
+#if CLR2
+                        IObjectUpdater
+#else
+                        dynamic
+#endif
+                >>("tracker", out tracker);
+            _trackerMaker = tracker;
 #endif
         }
 
@@ -151,9 +182,9 @@ namespace GameEngine {
             _timer.Elapsed += (sender, args) => {
                 _canvas.Dispatcher.BeginInvoke((Action) (() => {
                     try {
-                        if (_callback != null) {
+                        if (_callback != null)
                             _callback();
-                        }
+
                         if (_trackerMaker != null) {
                             foreach (UIElement element in _canvas.Children) {
 #if CLR2
@@ -186,6 +217,24 @@ namespace GameEngine {
             _timer.Start();
         }
 
+        public void StopAnimations() {
+            _timer.Stop();
+        }
+
+        public void StartAnimations() {
+            _timer.Start();
+        }
+
+        public void ClearAnimations() {
+            CodeScope.RemoveVariable("tracker");
+            CodeScope.RemoveVariable("callback");
+            _callback = null;
+            _trackerMaker = null;
+            foreach (UIElement element in _canvas.Children) {
+                element.SetValue(TrackerProperty, null);
+            }
+        }
+
         // Loads assemblies and creates a scope for everything to run in
         private void InitializeHosting() {
 #if HOSTING
@@ -212,17 +261,15 @@ namespace GameEngine {
         // Redirects Ruby's output to the _output TextBox
         private void RedirectOutput(ScriptEngine engine) {
             Action redirect = () => {
-
                 var outputScope = engine.CreateScope();
                 _textboxBuffer = new TextBoxBuffer(_output);
                 outputScope.SetVariable("__output__", _textboxBuffer);
                 engine.Execute("$stdout = __output__", outputScope);
             };
-            if (_output.IsLoaded) {
+            if (_output.IsLoaded)
                 redirect();
-            } else {
+            else
                 _output.Loaded += (sender, args) => redirect();
-            }
         }
 #endif
     }
