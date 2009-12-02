@@ -1,4 +1,6 @@
 class Circles
+
+  # called one at the creation of this animation
   def setup(container)
     @container = container
     @draw_on = false
@@ -10,6 +12,8 @@ class Circles
                   [255,235,149]]
   end
  
+  # the following methods are event hooks
+
   def mouse_pressed(s,e)
     @draw_on = true
     @mouse = e
@@ -24,20 +28,24 @@ class Circles
     @mouse = e
     @d += 1
   end
-   
+
+  # called for each frame of animation
+
+  def draw
+    if @draw_on
+      mouse_pos = @mouse.get_position @container
+      my_circle(mouse_pos.x, mouse_pos.y, @d)
+    end
+  end 
+  
+  # helper methods
+
   def random_color
     @color_set[rand(@color_set.size)]
   end
  
   def random_transparency
     rand
-  end
- 
-  def draw
-    if @draw_on
-      mouse_pos = @mouse.get_position @container
-      my_circle(mouse_pos.x, mouse_pos.y, @d)
-    end
   end
  
   def my_circle(x,y,d)
