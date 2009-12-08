@@ -1,5 +1,4 @@
 ﻿#define HOSTING
-#define CLR2
 
 using System;
 using System.Collections.Generic;

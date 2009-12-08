@@ -1,6 +1,7 @@
 ﻿<Window x:Class="GameEngine.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:dlrControls="clr-namespace:Microsoft.Scripting.Controls;assembly=Microsoft.Scripting.Controls"
         Title="MainWindow" Height="500" Width="780">
     <Grid Background="#771111">
         <Grid.ColumnDefinitions>
@@ -22,19 +23,15 @@
         <GridSplitter x:Name="_editorToggle" ResizeDirection="Columns" Grid.RowSpan="4" Width="12" Background="#444" />
         <TabControl x:Name="_tabs" Grid.Row="0" Grid.Column="1" Grid.RowSpan="2" Margin="0,12,12,0" >
             <TabItem Header="interactive.rb">
-                <TextBox
-                    AcceptsReturn="True" AcceptsTab="True" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
-                    Name="_code" FontFamily="Consolas" FontSize="16" />
+                <TextBox FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Name="_code" FontSize="12" />
             </TabItem>
             <TabItem Header="History">
-                <TextBox
-                    AcceptsReturn="True" AcceptsTab="True" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
-                    Name="_history" FontFamily="Consolas" FontSize="16" IsReadOnly="True" />
+                <TextBox FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Name="_history" FontSize="12" IsReadOnly="True" />
             </TabItem>
         </TabControl>
         <TextBox Grid.Row="2"  Grid.Column="1" TextWrapping="WrapWithOverflow"
                 VerticalScrollBarVisibility="Auto"
-                Margin="0,12,12,0" Name="_output" FontFamily="Consolas" FontSize="14" IsReadOnly="True" />
+                Margin="0,12,12,0" Name="_output" FontFamily="Consolas" FontSize="12" IsReadOnly="True" />
         <StackPanel x:Name="_outputControls" Margin="0,0,0,12" Grid.Row="3" Grid.Column="1" Orientation="Horizontal">
         </StackPanel>
     </Grid>

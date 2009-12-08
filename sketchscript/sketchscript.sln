@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "game-engine", "game-engine\game-engine.csproj", "{FB938A06-1DC9-4845-B309-CECC6C5C0633}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "sketchscript", "sketchscript\sketchscript.csproj", "{FB938A06-1DC9-4845-B309-CECC6C5C0633}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
