@@ -174,6 +174,19 @@ def select_upto_next_pause(indicatortxt = '#%pause')
   scroll_to_first_selected_line
 end
 
+#
+# opens a filename from the path, and shows it in the first tab
+#
+def open(filename)
+  $:.each do |path|
+    fullpath = File.join(path, filename)
+    if File.exist?(fullpath)
+      window.code.text = File.read(fullpath)
+      return;
+    end
+  end
+end
+
 # kick off everything
 
 setup
