@@ -1,6 +1,4 @@
-﻿#define HOSTING
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,204 +14,127 @@ using System.Windows.Shapes;
 using System.Timers;
 using System.IO;
 
-#if HOSTING
 using Microsoft.Scripting;
 using Microsoft.Scripting.Hosting;
 using IronRuby.Builtins;
-#endif
 
-namespace GameEngine {
+using AeroGlass;
+
+namespace SketchScript {
+
     public partial class MainWindow : Window {
-#if HOSTING
-        // Hosting fields
-        public ScriptRuntime Runtime { get; private set; }
-        public 
-#if CLR2
-            ScriptScope
-#else
-            dynamic
-#endif
-            CodeScope { get; private set; }
-        private ScriptEngine _currentEngine;
-#endif
-        // IDE fields
-        private bool _isCtrlPressed;
-        private bool _isOutputRedirected;
-        private TextBoxBuffer _textboxBuffer;
 
-        // callback fields
+        public Scripting _scripting { get; private set; }
+
+        private bool _isCtrlPressed;
+        public TextBoxBuffer TextBoxBuffer { get; internal set; }
+
         private readonly Timer _timer = new Timer();
         private bool _areCallbacksRegistered;
-        private Action _callback;
-        private Func<object,
+        public Action EachFrame { get; internal set; }
+        public Func<object,
 #if CLR2
             IObjectUpdater
 #else
             dynamic
 #endif
-            > _trackerMaker;
-        private static DependencyProperty TrackerProperty = DependencyProperty.RegisterAttached("TrackerProperty", typeof(object), typeof(UIElement));
 
-        // UI fields
+            > EachFrameAndObject { get; internal set; }
+        private static DependencyProperty EachFrameAndObjectProperty = DependencyProperty.RegisterAttached("EachFrameAndObjectProperty", typeof(object), typeof(UIElement));
+
         public TextBox History { get { return _history; } }
         public TextBox Output { get { return _output; } }
         public TextBox Code { get { return _code; } }
         public StackPanel CanvasControls { get { return _canvasControls; } }
         public StackPanel OutputControls { get { return _outputControls; } }
         public GridSplitter EditorToggle { get { return _editorToggle; } }
+        public GridSplitter ConsoleSplitter { get { return _consoleSplitter; } }
 
         public MainWindow() {
             InitializeComponent();
 
+            this.SourceInitialized += (sender, e) => {
+                GlassHelper.ExtendGlassFrame(this, new Thickness(-1));
+            };
+
             this.Loaded += (s,e) => {
-                InitializeHosting();
-#if HOSTING
-                // Get the Ruby engine by name.
-                _currentEngine = Runtime.GetEngine("Ruby");
-#endif
 
                 // When Ctrl-Enter is pressed, run the script code
-                _code.KeyDown += (sender, args) => {
+                _code.KeyDown += (se, args) => {
                     if (args.Key == Key.LeftCtrl || args.Key == Key.RightCtrl)
                         _isCtrlPressed = true;
-
-                    if (_isCtrlPressed && args.Key == Key.Enter) {
-#if HOSTING
+                    if (_isCtrlPressed && args.Key == Key.Enter)
                         RunCode(_code);
-                    }
                 };
-                _code.KeyUp += (sender, args) => {
+                _code.KeyUp += (se, args) => {
                     if (args.Key == Key.LeftCtrl || args.Key == Key.RightCtrl)
                         _isCtrlPressed = false;
                 };
 
-#if HOSTING
-                string path = "../../../features/basic.rb";
-                string code = File.ReadAllText(path);
-                RunCode(code, path);
-#if CLR2
-                Action setup = null;
-                CodeScope.TryGetVariable<Action>("setup", out setup);
-                if (setup != null) setup();
-#else
-                CodeScope.setup();
-#endif
-#endif
+                _scripting = new Scripting(this);
+
+                // Get the Ruby engine by name.
+                _scripting.SetCurrentEngine("Ruby");
+
+                // Require a setup file and call the "setup" method
+//                _scripting.RunFile("../../../features/basic.rb");
+//#if CLR2
+//                Action setup = null;
+//                _scripting.CodeScope.TryGetVariable<Action>("setup", out setup);
+//                if (setup != null) setup();
+//#else
+//                _scripting.CodeScope.setup();
+//#endif
             };
         }
 
         public void RunCode(TextBox t) {
             string code = t.SelectionLength > 0 ? t.SelectedText : t.Text;
-            RunCode(code);
+            _scripting.RunCode(code);
         }
 
-        public void RunCode(string codeToRun) {
-            RunCode(codeToRun, null);
-        }
+        internal void RegisterCallbacks() {
+            // Registers the callbacks that are fired 30 times a second.
+            if (!_areCallbacksRegistered) {    
+                // Run animations
+                _timer.Elapsed += (sender, args) => {
+                    _canvas.Dispatcher.BeginInvoke((Action) (() => {
+                        try {
+                            if (EachFrame != null)
+                                EachFrame();
 
-        public void RunCode(string codeToRun, string path) {
-            try {
-                // Redirects all script output to the output textbox.
-                if (!_isOutputRedirected) {
-                    RedirectOutput(_currentEngine);
-                    _isOutputRedirected = true;
-                }
-
-                // Registers the callbacks that are fired 30 times a second.
-                if (!_areCallbacksRegistered) {
-                    RegisterCallbacks();
-                    _areCallbacksRegistered = true;
-                }
-
-                // Executes the script code against the shared scope to persist
-                // variables between executions.
-                object result = null;
-                if (path == null)
-                    result = _currentEngine.Execute(codeToRun, CodeScope);
-                else
-                    result = _currentEngine.CreateScriptSourceFromString(codeToRun, path, SourceCodeKind.File).Execute(CodeScope);
-
-                // Write the code and results to the history and output areas
-                _history.AppendText(codeToRun);
+                            if (EachFrameAndObject != null) {
+                                foreach (UIElement element in _canvas.Children) {
 #if CLR2
-                CodeScope.SetVariable("_", result);
+                                    IObjectUpdater eachFrameAndObject = element.GetValue(EachFrameAndObjectProperty) as IObjectUpdater;
 #else
-                        CodeScope._ = result;
+                                    dynamic eachFrameAndObject = element.GetValue(EachFrameAndObjectProperty);
 #endif
-                string repr = _currentEngine.Execute<string>("_.inspect", CodeScope);
-                _textboxBuffer.write("=> " + repr + "\n");
-                _history.AppendText("\n# => " + repr + "\n");
-            } catch (Exception ex) {
-                string formattedEx = _currentEngine.GetService<ExceptionOperations>().FormatException(ex);
-                if (_isOutputRedirected)
-                    this.Dispatcher.BeginInvoke((Action)(() => _textboxBuffer.write(formattedEx)));
-                else
-                    System.Windows.MessageBox.Show(formattedEx);
-            }
-
-            // "callback" is called 30-times a second without any arguments.
-            Action callbackAction = null;
-            CodeScope.TryGetVariable<Action>("callback", out callbackAction);
-            _callback = callbackAction;
-
-            // "tracker" is called 30-times a second with one "object" argument,
-            // is expected to return a IObjectUpdater
-            Func<object,
-#if CLR2
-                        IObjectUpdater
-#else
-                        dynamic
-#endif
-                > tracker = null;
-            CodeScope.TryGetVariable<Func<object,
-#if CLR2
-                        IObjectUpdater
-#else
-                        dynamic
-#endif
-                >>("tracker", out tracker);
-            _trackerMaker = tracker;
-#endif
-        }
-
-        private void RegisterCallbacks() {
-            // Run animations
-            _timer.Elapsed += (sender, args) => {
-                _canvas.Dispatcher.BeginInvoke((Action) (() => {
-                    try {
-                        if (_callback != null)
-                            _callback();
-
-                        if (_trackerMaker != null) {
-                            foreach (UIElement element in _canvas.Children) {
-#if CLR2
-                                IObjectUpdater tracker = element.GetValue(TrackerProperty) as IObjectUpdater;
-#else
-                                dynamic tracker = element.GetValue(TrackerProperty);
-#endif
-
-                                if (tracker == null && _trackerMaker != null) {
-                                    tracker = _trackerMaker(element);
-                                    element.SetValue(TrackerProperty, tracker);
-                                }
-                                if (tracker != null) {
-                                    tracker.update(element);
-                                    // IronRuby.Ruby.GetEngine(Runtime).Operations.InvokeMember(tracker, "update", element);
+                                    if (eachFrameAndObject == null && EachFrameAndObject != null) {
+                                        eachFrameAndObject = EachFrameAndObject(element);
+                                        element.SetValue(EachFrameAndObjectProperty, eachFrameAndObject);
+                                    }
+                                    if (eachFrameAndObject != null) {
+                                        eachFrameAndObject.update(element);
+                                        // Note: if "tracker" was not dynamic, or not a IObjectUpdater, then you'd have to write this:
+                                        // IronRuby.Ruby.GetEngine(Runtime).Operations.InvokeMember(eachFrameAndObject, "update", element);
+                                    }
                                 }
                             }
                         }
-                    }
-                    catch (Exception e) {
-                        _callback = null;
-                        _trackerMaker = null;
-                        _textboxBuffer.write("Error during callback: " + e.ToString());
-                        _timer.Stop();
-                        _areCallbacksRegistered = false;
-                    }
-                }));
-            };
-            _timer.Interval = 1000 / 30;
-            _timer.Start();
+                        catch (Exception e) {
+                            EachFrame = null;
+                            EachFrameAndObject = null;
+                            TextBoxBuffer.write("Error during callback: " + e.ToString());
+                            _timer.Stop();
+                            _areCallbacksRegistered = false;
+                        }
+                    }));
+                };
+                _timer.Interval = 1000 / 30;
+                _timer.Start();
+                _areCallbacksRegistered = true;
+            }
         }
 
         public void StopAnimations() {
@@ -225,52 +146,36 @@ namespace GameEngine {
         }
 
         public void ClearAnimations() {
-            CodeScope.RemoveVariable("tracker");
-            CodeScope.RemoveVariable("callback");
-            _callback = null;
-            _trackerMaker = null;
+            _scripting.CodeScope.RemoveVariable("each_frame_and_object");
+            _scripting.CodeScope.RemoveVariable("each_frame");
+            EachFrame = null;
+            EachFrameAndObject = null;
             foreach (UIElement element in _canvas.Children) {
-                element.SetValue(TrackerProperty, null);
+                element.SetValue(EachFrameAndObjectProperty, null);
             }
         }
 
-        // Loads assemblies and creates a scope for everything to run in
-        private void InitializeHosting() {
-#if HOSTING
-            Runtime = ScriptRuntime.CreateFromConfiguration();
-            Runtime.LoadAssembly(typeof(Canvas).Assembly);
-            Runtime.LoadAssembly(typeof(Brushes).Assembly);
-            Runtime.LoadAssembly(GetType().Assembly);
-            CreateScope();
-        }
-        private void CreateScope() {
-            CodeScope = Runtime.CreateScope();
-#if CLR2
-            CodeScope.SetVariable("canvas", _canvas);
-            CodeScope.SetVariable("window", this);
-#else
-            dynamic codeScope = CodeScope;
-            codeScope.window = this;
-            codeScope.canvas = _canvas;
-#endif
-#endif
-        }
+        //private bool neverRendered = true;
 
-#if HOSTING
-        // Redirects Ruby's output to the _output TextBox
-        private void RedirectOutput(ScriptEngine engine) {
-            Action redirect = () => {
-                var outputScope = engine.CreateScope();
-                _textboxBuffer = new TextBoxBuffer(_output);
-                outputScope.SetVariable("__output__", _textboxBuffer);
-                engine.Execute("$stdout = __output__", outputScope);
-            };
-            if (_output.IsLoaded)
-                redirect();
-            else
-                _output.Loaded += (sender, args) => redirect();
-        }
-#endif
+        //protected override void OnContentRendered(EventArgs e) {
+        //    if (this.neverRendered) {
+        //        // The window takes the size of its content because SizeToContent
+        //        // is set to WidthAndHeight in the markup. We then allow
+        //        // it to be set by the user, and have the content take the size
+        //        // of the window.
+        //        this.SizeToContent = SizeToContent.Manual;
+
+        //        FrameworkElement root = this.Content as FrameworkElement;
+        //        if (root != null) {
+        //            root.Width = double.NaN;
+        //            root.Height = double.NaN;
+        //        }
+
+        //        this.neverRendered = false;
+        //    }
+
+        //    base.OnContentRendered(e);
+        //}
     }
 
     // Simple TextBox Buffer class
@@ -287,8 +192,130 @@ namespace GameEngine {
         }
     }
 
+    public class Scripting {
+
+        public ScriptRuntime Runtime { get; private set; }
+        public 
 #if CLR2
-    // Implement this interface, and the Update method gets called 30 times a second
+            ScriptScope 
+#else
+            dynamic
+#endif
+            CodeScope { get; private set; }
+        private ScriptEngine _currentEngine;
+
+        private MainWindow _window;
+        private bool _isOutputRedirected;
+
+        public Scripting(MainWindow window) {
+            _window = window;
+            InitializeHosting();
+        }
+
+        public void SetCurrentEngine(string engineName) {
+            _currentEngine = Runtime.GetEngine(engineName);
+        }
+
+        public void RunFile(string path) {
+            string code = File.ReadAllText(path);
+            RunCode(code, path);
+        }
+
+        public void RunCode(string codeToRun) {
+            RunCode(codeToRun, null);
+        }
+
+        public void RunCode(string codeToRun, string path) {
+            try {
+                RedirectOutput(_currentEngine);
+                _window.RegisterCallbacks();
+
+                // Executes the script code against the shared scope to persist
+                // variables between executions.
+                object result = null;
+                if (path == null)
+                    result = _currentEngine.Execute(codeToRun, CodeScope);
+                else
+                    result = _currentEngine.CreateScriptSourceFromString(codeToRun, path, SourceCodeKind.File).Execute(CodeScope);
+
+                // Write the code and results to the history and output areas
+                _window.History.AppendText(codeToRun);
+#if CLR2
+                CodeScope.SetVariable("_", result);
+#else
+                CodeScope._ = result;
+#endif
+                string repr = _currentEngine.Execute<string>("_.inspect", CodeScope);
+                _window.TextBoxBuffer.write("=> " + repr + "\n");
+                _window.History.AppendText("\n# => " + repr + "\n");
+            } catch (Exception ex) {
+                string formattedEx = _currentEngine.GetService<ExceptionOperations>().FormatException(ex);
+                if (_isOutputRedirected)
+                    _window.Dispatcher.BeginInvoke((Action)(() => _window.TextBoxBuffer.write(formattedEx)));
+                else
+                    System.Windows.MessageBox.Show(formattedEx);
+            }
+
+            // "each_frame" is called 30-times a second without any arguments.
+            Action eachFrame = null;
+            CodeScope.TryGetVariable<Action>("each_frame", out eachFrame);
+            _window.EachFrame = eachFrame;
+
+            // "each_frame_and_object" is called 30-times a second with one "object" argument,
+            // is expected to return a IObjectUpdater
+            Func<object,
+#if CLR2
+                IObjectUpdater
+#else
+                dynamic
+#endif
+                > eachFrameAndObject = null;
+            CodeScope.TryGetVariable<Func<object,
+#if CLR2
+                IObjectUpdater
+#else
+                dynamic
+#endif
+                >>("each_frame_and_object", out eachFrameAndObject);
+            _window.EachFrameAndObject = eachFrameAndObject;
+        }
+
+        // Loads assemblies and creates a scope for everything to run in
+        private void InitializeHosting() {
+            Runtime = ScriptRuntime.CreateFromConfiguration();
+            Runtime.LoadAssembly(typeof(Canvas).Assembly);
+            Runtime.LoadAssembly(typeof(Brushes).Assembly);
+            Runtime.LoadAssembly(GetType().Assembly);
+            CodeScope = Runtime.CreateScope();
+#if CLR2
+            CodeScope.SetVariable("canvas", _canvas);
+            CodeScope.SetVariable("window", this);
+#else
+            CodeScope.window = _window;
+            CodeScope.canvas = _window._canvas;
+#endif
+        }
+
+        // Redirects Ruby's output to the _output TextBox
+        private void RedirectOutput(ScriptEngine engine) {
+            if (!_isOutputRedirected) {
+                Action redirect = () => {
+                    var outputScope = engine.CreateScope();
+                    _window.TextBoxBuffer = new TextBoxBuffer(_window.Output);
+                    outputScope.SetVariable("__output__", _window.TextBoxBuffer);
+                    engine.Execute("$stdout = __output__", outputScope);
+                };
+                if (_window.Output.IsLoaded)
+                    redirect();
+                else
+                    _window.Output.Loaded += (sender, args) => redirect();
+
+                _isOutputRedirected = true;
+            }
+        }
+    }
+
+#if CLR2
     public interface IObjectUpdater {
         void update(object target);
     }

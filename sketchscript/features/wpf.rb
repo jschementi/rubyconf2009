@@ -15,7 +15,7 @@ class System::Windows::Media::Brushes
   end
 
   def self.colors
-    public_methods(false) - Object.public_methods - ['rand', 'colors']
+    public_methods(false) - Object.public_methods - ['random', 'colors']
   end
 end
 
