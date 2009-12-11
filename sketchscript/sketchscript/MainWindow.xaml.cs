@@ -14,9 +14,11 @@ using System.Windows.Shapes;
 using System.Timers;
 using System.IO;
 
+#region Usings for hosting
 using Microsoft.Scripting;
 using Microsoft.Scripting.Hosting;
 using IronRuby.Builtins;
+#endregion
 
 using AeroGlass;
 using System.Diagnostics;
@@ -59,7 +61,7 @@ namespace SketchScript {
             };
 
             this.Loaded += (s,e) => {
-
+                #region Wecome Text
                 _code.Text = @"# Welcome to SketchScript!
 
 # All Ruby code typed here can be run by pressing
@@ -79,7 +81,9 @@ namespace SketchScript {
 require 'basic'
 
 # Check out the About tab for more information.";
+                #endregion
 
+                #region Ctrl-Enter to run code
                 // When Ctrl-Enter is pressed, run the script code
                 _code.KeyDown += (se, args) => {
                     if (args.Key == Key.LeftCtrl || args.Key == Key.RightCtrl)
@@ -91,7 +95,9 @@ require 'basic'
                     if (args.Key == Key.LeftCtrl || args.Key == Key.RightCtrl)
                         _isCtrlPressed = false;
                 };
+                #endregion
 
+                #region Initialize Ruby
                 _scripting = new Scripting(this);
 
                 // Get the Ruby engine by name.
@@ -99,6 +105,7 @@ require 'basic'
 
                 // Cute little trick: warm up the Ruby engine by running some code on another thread:
                 new SThread.Thread(new SThread.ThreadStart(() => _scripting.CurrentEngine.Execute("2 + 2"))).Start();
+                #endregion
             };
         }
 
@@ -108,9 +115,10 @@ require 'basic'
         }
 
         internal void RegisterCallbacks() {
+
             // Registers the callbacks that are fired 30 times a second.
-            if (!_areCallbacksRegistered) {    
-                // Run animations
+            if (!_areCallbacksRegistered) {
+
                 _timer.Elapsed += (sender, args) => {
                     _canvas.Dispatcher.BeginInvoke((Action) (() => {
                         try {
@@ -177,30 +185,9 @@ require 'basic'
                 System.Diagnostics.Process.Start(uri.ToString());
             }
         }
-
-        //private bool neverRendered = true;
-
-        //protected override void OnContentRendered(EventArgs e) {
-        //    if (this.neverRendered) {
-        //        // The window takes the size of its content because SizeToContent
-        //        // is set to WidthAndHeight in the markup. We then allow
-        //        // it to be set by the user, and have the content take the size
-        //        // of the window.
-        //        this.SizeToContent = SizeToContent.Manual;
-
-        //        FrameworkElement root = this.Content as FrameworkElement;
-        //        if (root != null) {
-        //            root.Width = double.NaN;
-        //            root.Height = double.NaN;
-        //        }
-
-        //        this.neverRendered = false;
-        //    }
-
-        //    base.OnContentRendered(e);
-        //}
     }
 
+#region Running code helpers
     // Simple TextBox Buffer class
     public class TextBoxBuffer {
         TextBox box;
@@ -346,3 +333,4 @@ require 'basic'
     }
 #endif
 }
+#endregion
