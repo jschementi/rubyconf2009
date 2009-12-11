@@ -125,7 +125,7 @@ class Bouncer
   end
 end
 
-def each_frame_and_object target
+def each_object target
   Bouncer.new rand(10) - 5, rand(10) - 5, @canvas, @offset
 end
 

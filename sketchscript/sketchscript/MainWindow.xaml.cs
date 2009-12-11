@@ -20,6 +20,7 @@ using IronRuby.Builtins;
 
 using AeroGlass;
 using System.Diagnostics;
+using SThread = System.Threading;
 
 namespace SketchScript {
 
@@ -39,9 +40,8 @@ namespace SketchScript {
 #else
             dynamic
 #endif
-
-            > EachFrameAndObject { get; internal set; }
-        private static DependencyProperty EachFrameAndObjectProperty = DependencyProperty.RegisterAttached("EachFrameAndObjectProperty", typeof(object), typeof(UIElement));
+            > EachObject { get; internal set; }
+        private static DependencyProperty EachObjectProperty = DependencyProperty.RegisterAttached("EachObjectProperty", typeof(object), typeof(UIElement));
 
         public TextBox History { get { return _history; } }
         public TextBox Output { get { return _output; } }
@@ -97,15 +97,8 @@ require 'basic'
                 // Get the Ruby engine by name.
                 _scripting.SetCurrentEngine("Ruby");
 
-                // Require a setup file and call the "setup" method
-//                _scripting.RunFile("../../../features/basic.rb");
-//#if CLR2
-//                Action setup = null;
-//                _scripting.CodeScope.TryGetVariable<Action>("setup", out setup);
-//                if (setup != null) setup();
-//#else
-//                _scripting.CodeScope.setup();
-//#endif
+                // Cute little trick: warm up the Ruby engine by running some code on another thread:
+                new SThread.Thread(new SThread.ThreadStart(() => _scripting.CurrentEngine.Execute("2 + 2"))).Start();
             };
         }
 
@@ -124,19 +117,19 @@ require 'basic'
                             if (EachFrame != null)
                                 EachFrame();
 
-                            if (EachFrameAndObject != null) {
+                            if (EachObject != null) {
                                 foreach (UIElement element in _canvas.Children) {
 #if CLR2
-                                    IObjectUpdater eachFrameAndObject = element.GetValue(EachFrameAndObjectProperty) as IObjectUpdater;
+                                    IObjectUpdater eachObject = element.GetValue(EachObjectProperty) as IObjectUpdater;
 #else
-                                    dynamic eachFrameAndObject = element.GetValue(EachFrameAndObjectProperty);
+                                    dynamic eachObject = element.GetValue(EachObjectProperty);
 #endif
-                                    if (eachFrameAndObject == null && EachFrameAndObject != null) {
-                                        eachFrameAndObject = EachFrameAndObject(element);
-                                        element.SetValue(EachFrameAndObjectProperty, eachFrameAndObject);
+                                    if (eachObject == null && EachObject != null) {
+                                        eachObject = EachObject(element);
+                                        element.SetValue(EachObjectProperty, eachObject);
                                     }
-                                    if (eachFrameAndObject != null) {
-                                        eachFrameAndObject.update(element);
+                                    if (eachObject != null) {
+                                        eachObject.update(element);
                                         // Note: if "tracker" was not dynamic, or not a IObjectUpdater, then you'd have to write this:
                                         // IronRuby.Ruby.GetEngine(Runtime).Operations.InvokeMember(eachFrameAndObject, "update", element);
                                     }
@@ -145,7 +138,7 @@ require 'basic'
                         }
                         catch (Exception e) {
                             EachFrame = null;
-                            EachFrameAndObject = null;
+                            EachObject = null;
                             TextBoxBuffer.write("Error during callback: " + e.ToString());
                             _timer.Stop();
                             _areCallbacksRegistered = false;
@@ -167,12 +160,12 @@ require 'basic'
         }
 
         public void ClearAnimations() {
-            _scripting.CodeScope.RemoveVariable("each_frame_and_object");
+            _scripting.CodeScope.RemoveVariable("each_object");
             _scripting.CodeScope.RemoveVariable("each_frame");
             EachFrame = null;
-            EachFrameAndObject = null;
+            EachObject = null;
             foreach (UIElement element in _canvas.Children) {
-                element.SetValue(EachFrameAndObjectProperty, null);
+                element.SetValue(EachObjectProperty, null);
             }
         }
 
@@ -232,7 +225,8 @@ require 'basic'
             dynamic
 #endif
             CodeScope { get; private set; }
-        private ScriptEngine _currentEngine;
+        public ScriptEngine CurrentEngine { get; private set; }
+
 
         private MainWindow _window;
         private bool _isOutputRedirected;
@@ -243,7 +237,7 @@ require 'basic'
         }
 
         public void SetCurrentEngine(string engineName) {
-            _currentEngine = Runtime.GetEngine(engineName);
+            CurrentEngine = Runtime.GetEngine(engineName);
         }
 
         public void RunFile(string path) {
@@ -257,16 +251,16 @@ require 'basic'
 
         public void RunCode(string codeToRun, string path) {
             try {
-                RedirectOutput(_currentEngine);
+                RedirectOutput(CurrentEngine);
                 _window.RegisterCallbacks();
 
                 // Executes the script code against the shared scope to persist
                 // variables between executions.
                 object result = null;
                 if (path == null)
-                    result = _currentEngine.Execute(codeToRun, CodeScope);
+                    result = CurrentEngine.Execute(codeToRun, CodeScope);
                 else
-                    result = _currentEngine.CreateScriptSourceFromString(codeToRun, path, SourceCodeKind.File).Execute(CodeScope);
+                    result = CurrentEngine.CreateScriptSourceFromString(codeToRun, path, SourceCodeKind.File).Execute(CodeScope);
 
                 // Write the code and results to the history and output areas
                 _window.History.AppendText(codeToRun);
@@ -275,11 +269,11 @@ require 'basic'
 #else
                 CodeScope._ = result;
 #endif
-                string repr = _currentEngine.Execute<string>("_.inspect", CodeScope);
+                string repr = CurrentEngine.Execute<string>("_.inspect", CodeScope);
                 _window.TextBoxBuffer.write("=> " + repr + "\n");
                 _window.History.AppendText("\n# => " + repr + "\n");
             } catch (Exception ex) {
-                string formattedEx = _currentEngine.GetService<ExceptionOperations>().FormatException(ex);
+                string formattedEx = CurrentEngine.GetService<ExceptionOperations>().FormatException(ex);
                 if (_isOutputRedirected)
                     _window.Dispatcher.BeginInvoke((Action)(() => _window.TextBoxBuffer.write(formattedEx)));
                 else
@@ -291,23 +285,24 @@ require 'basic'
             CodeScope.TryGetVariable<Action>("each_frame", out eachFrame);
             _window.EachFrame = eachFrame;
 
-            // "each_frame_and_object" is called 30-times a second with one "object" argument,
-            // is expected to return a IObjectUpdater
+            // "each_object" is called once to get a IObjectUpdater (or dynamic)
+            // which has an "update" method, which is called 30-times a second
+            // for each object in the canvas.
             Func<object,
 #if CLR2
                 IObjectUpdater
 #else
                 dynamic
 #endif
-                > eachFrameAndObject = null;
+                > eachObject = null;
             CodeScope.TryGetVariable<Func<object,
 #if CLR2
                 IObjectUpdater
 #else
                 dynamic
 #endif
-                >>("each_frame_and_object", out eachFrameAndObject);
-            _window.EachFrameAndObject = eachFrameAndObject;
+                >>("each_object", out eachObject);
+            _window.EachObject = eachObject;
         }
 
         // Loads assemblies and creates a scope for everything to run in
