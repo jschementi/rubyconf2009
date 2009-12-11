@@ -87,11 +87,11 @@ end
 #
 # add a "show" and "hide" method to the "type", which hides/shows row "i"
 #
-def __generate_show_and_hide_methods(type, i)
+def __generate_show_and_hide_methods(type, i, height = 23)
   self.instance_eval %{
     class << window.#{type}_controls
       def show
-        $window.content.row_definitions[#{i}].height = GridLength.new(23)
+        $window.content.row_definitions[#{i}].height = GridLength.new(#{height})
       end
       def hide
         $window.content.row_definitions[#{i}].height = GridLength.new(0)
@@ -112,7 +112,7 @@ def reset_host_state
   window.console_splitter.mouse_leave.remove @_mouse_leave if @_mouse_leave
   window.code.text = ''
   window.output.text = ''
-  window.history.text = ''
+  #window.history.text = ''
 end
 
 # "light up" the grid splitters -- so people know that
@@ -163,8 +163,9 @@ end
 # called by host automatically
 #
 def setup
-  __generate_show_and_hide_methods :canvas, 0
-  __generate_show_and_hide_methods :output, 4
+  height = defined?(DEMO) && DEMO ? 34 : 23
+  __generate_show_and_hide_methods :canvas, 0, height
+  __generate_show_and_hide_methods :output, 4, height
 
   reset_host_state
 

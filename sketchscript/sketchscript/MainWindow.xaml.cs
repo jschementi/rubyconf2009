@@ -80,7 +80,22 @@ namespace SketchScript {
 
 require 'basic'
 
-# Check out the About tab for more information.";
+# Check out the About tab for more information.
+
+#
+# Need to make fonts bigger for a demo?
+#
+DEMO = true
+window.font_size = 16
+window.width = 1020
+window.height = 768
+window.code.font_size = 18
+window.history.font_size = 16
+window.output.font_size = 18
+window.find_name('_tabs').items.each do |i|
+  i.font_size = 16
+end
+window.output.clear";
                 #endregion
 
                 #region Ctrl-Enter to run code
