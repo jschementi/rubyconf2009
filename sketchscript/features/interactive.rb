@@ -1,3 +1,14 @@
+# Whoa, what just happened here?
+# basic.rb ran, that's what. To see what
+# exactly happened, run:
+#
+# open "basic.rb"
+# 
+# To walk through *this* file in demo-mode,
+# just press the "Run Next" button to run 
+# and highlight the code up until the next 
+# %pause comment.
+
 def reset_interactive
   @interactive_canvas_ctrls.each do |icc|
     window.canvas_controls.children.remove icc
@@ -14,11 +25,22 @@ end
 reset_interactive
 
 #
+# Add a clear button for the output window
+#
+@interactive_output_ctrls << (as_button("Clear", window.output_controls) { |s,e|
+  window.output.text = ''
+})
+
+#
 # render "count" random squares
 #
 def random_squares(count = 200)
   count.times{ |i| random_square }
 end
+
+@interactive_canvas_ctrls << (as_button("Squares", window.canvas_controls) { |s,e|
+  random_squares
+})
 
 random_squares
 
@@ -42,6 +64,10 @@ end
 
 large_circle
 
+@interactive_canvas_ctrls << (as_button("Circle", window.canvas_controls) { |s,e|
+  large_circle
+})
+
 #%pause
 
 #
@@ -58,6 +84,20 @@ def each_frame
     Canvas.set_left child, @dim * Math.cos(angle) + @dim
   end
 end
+
+#
+# Add animation controls
+#
+@interactive_canvas_ctrls << (as_button(@_paused ? "Resume" : "Pause", window.canvas_controls) { |s,e|
+  @_paused = !@_paused
+  s.content = @_paused ? "Resume" : "Pause"
+  @_paused ? window.stop_animations : window.start_animations
+})
+@interactive_canvas_ctrls << (as_button("Stop", window.canvas_controls) { |s,e|
+  window.clear_animations
+  @_paused = nil
+  @interactive_canvas_ctrls[-2].content = "Pause"
+})
 
 #%pause
 
@@ -92,12 +132,7 @@ end
 #%pause
 
 window.clear_animations
-
-#%pause
-
 cls
-
-#%pause
 
 #
 # Enable an object to be dragged
@@ -122,34 +157,9 @@ end
 
 drag clock.canvas
 
-#%pause
-
-#
-# Adds a bunch of buttons to fill out the interface
-#
-def add_interactive_buttons
-  @interactive_canvas_ctrls << (as_button("Squares", window.canvas_controls) { |s,e|
-    random_squares
-  })
-  @interactive_canvas_ctrls << (as_button("Large circle", window.canvas_controls) { |s,e|
-    large_circle
-  })
-  @interactive_output_ctrls << (as_button("Clear", window.output_controls) { |s,e|
-    window.output.text = ''
-  })
-  @interactive_canvas_ctrls << (as_button("Pause", window.canvas_controls) { |s,e|
-    @_paused = !@_paused
-    s.content = @_paused ? "Resume" : "Pause"
-    @_paused ? window.stop_animations : window.start_animations
-  })
-  @interactive_canvas_ctrls << (as_button("Stop", window.canvas_controls) { |s,e|
-    window.clear_animations
-    @_paused = nil
-    @interactive_canvas_ctrls[-2].content = "Pause"
-  })
-end
-
-add_interactive_buttons
+@interactive_canvas_ctrls << (as_button("Clock", window.canvas_controls) { |s,e|
+  drag clock.canvas
+})
 
 #%pause
 

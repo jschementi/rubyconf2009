@@ -19,6 +19,7 @@ using Microsoft.Scripting.Hosting;
 using IronRuby.Builtins;
 
 using AeroGlass;
+using System.Diagnostics;
 
 namespace SketchScript {
 
@@ -58,6 +59,26 @@ namespace SketchScript {
             };
 
             this.Loaded += (s,e) => {
+
+                _code.Text = @"# Welcome to SketchScript!
+
+# All Ruby code typed here can be run by pressing
+# Ctrl-Enter. If you don't want to run everything,
+# just select the text you wan to run and press
+# the same key combination.
+
+# This is nothing more than a Ruby interpreter:
+# Try the following; it will print to the output
+# window below the code:
+
+10.times{|i| puts i * i}
+
+# basic.rb will reset this environment for some
+# cool demos:
+
+require 'basic'
+
+# Check out the About tab for more information.";
 
                 // When Ctrl-Enter is pressed, run the script code
                 _code.KeyDown += (se, args) => {
@@ -152,6 +173,15 @@ namespace SketchScript {
             EachFrameAndObject = null;
             foreach (UIElement element in _canvas.Children) {
                 element.SetValue(EachFrameAndObjectProperty, null);
+            }
+        }
+
+        private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e) {
+            Uri uri = ((Hyperlink)sender).NavigateUri;
+            if (uri != null) {
+                if (!uri.IsAbsoluteUri)
+                    throw new InvalidOperationException("An absolute URI is required.");
+                System.Diagnostics.Process.Start(uri.ToString());
             }
         }
 

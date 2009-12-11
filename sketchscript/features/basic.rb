@@ -1,3 +1,9 @@
+# You are viewing basic.rb, which as the name
+# infers, only adds very basic features to 
+# sketchscript. For the cool demos, run:
+#
+# open "interactive.rb"
+
 #
 # wpf.rb gives nice helpers for gui apps
 #
@@ -39,7 +45,7 @@ end
 #
 def random_square
   rect = Rectangle.new
-  rect.width, rect.height, rect.fill = @rect_size, @rect_size, random_pretty_color 
+  rect.width, rect.height, rect.fill = @rect_size, @rect_size, random_pretty_color
   canvas.children.add rect
   Canvas.set_left rect, rand(canvas.actual_width - @offset)
   Canvas.set_top  rect, rand(canvas.actual_height - @offset)
@@ -60,6 +66,25 @@ def as_button name, container, &block
 end
 
 #
+# opens a filename from the path, and shows it in the code tab
+#
+def open(filename)
+  if contents = find_file_on_path(filename)
+    window.code.text = contents
+  end
+end
+
+def find_file_on_path(filename)
+  $:.each do |path|
+    fullpath = File.join(path, filename)
+    if File.exist?(fullpath)
+      return File.read(fullpath)
+    end
+  end
+  nil
+end
+
+#
 # add a "show" and "hide" method to the "type", which hides/shows row "i"
 #
 def __generate_show_and_hide_methods(type, i)
@@ -77,10 +102,17 @@ end
 
 def reset_host_state
   window.canvas_controls.children.clear
+  window.canvas_controls.hide
   window.output_controls.children.clear
+  window.output_controls.hide
   canvas.children.clear
   window.editor_toggle.mouse_enter.remove @_mouse_enter if @_mouse_enter
   window.editor_toggle.mouse_leave.remove @_mouse_leave if @_mouse_leave
+  window.console_splitter.mouse_enter.remove @_mouse_enter if @_mouse_enter
+  window.console_splitter.mouse_leave.remove @_mouse_leave if @_mouse_leave
+  window.code.text = ''
+  window.output.text = ''
+  window.history.text = ''
 end
 
 # "light up" the grid splitters -- so people know that
@@ -90,12 +122,12 @@ def hover_for_splitters
     @__tempbrush = s.background
     s.background = SolidColorBrush.new Color.from_argb(0x55, 0xcc, 0xcc, 0xcc)
   end
-  window.editor_toggle.mouse_enter &@_mouse_enter
-  window.console_splitter.mouse_enter &@_mouse_enter
   @_mouse_leave = lambda do |s, e|
     s.background = @__tempbrush
   end
+  window.editor_toggle.mouse_enter &@_mouse_enter
   window.editor_toggle.mouse_leave &@_mouse_leave
+  window.console_splitter.mouse_enter &@_mouse_enter
   window.console_splitter.mouse_leave &@_mouse_leave
 end
 
@@ -111,19 +143,19 @@ def add_default_buttons
   @default_canvas_buttons = []
   @default_output_buttons = []
 
-  @default_canvas_buttons << (as_button("Random Square", window.canvas_controls) { |s,e|
+  @default_canvas_buttons << (as_button("Square", window.canvas_controls) { |s,e|
     random_square
   })
   @default_canvas_buttons << (as_button("Clear", window.canvas_controls) { |s,e|
     canvas.children.clear
   })
   
-  @default_output_buttons << (as_button("Reload", window.output_controls) { |s,e|
-    reload
-  })
   @default_output_buttons << (as_button("Run next", window.output_controls) { |s,e|
     select_upto_next_pause
     window.run_code window.code
+  })
+  @default_output_buttons << (as_button("Reload", window.output_controls) { |s,e|
+    reload
   })
 end
 
@@ -140,8 +172,7 @@ def setup
 
   add_default_buttons
 
-  # load the "interactive" file into the interactive textbox
-  window.code.text = File.read("../../../features/interactive.rb")
+  open 'interactive.rb'
 end
 
 def reload
@@ -172,19 +203,6 @@ def select_upto_next_pause(indicatortxt = '#%pause')
   window.code.select offset, length
   window.code.focus
   scroll_to_first_selected_line
-end
-
-#
-# opens a filename from the path, and shows it in the first tab
-#
-def open(filename)
-  $:.each do |path|
-    fullpath = File.join(path, filename)
-    if File.exist?(fullpath)
-      window.code.text = File.read(fullpath)
-      return;
-    end
-  end
 end
 
 # kick off everything

@@ -28,6 +28,43 @@
             <TabItem Header="History">
                 <TextBox FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Name="_history" FontSize="12" IsReadOnly="True" />
             </TabItem>
+            <TabItem Header="About">
+                <RichTextBox FontFamily="Calibri" FontSize="12" IsReadOnly="True" IsDocumentEnabled="True" VerticalScrollBarVisibility="Auto">
+                    <FlowDocument>
+                        <Paragraph>
+                            <Run FontSize="18" FontWeight="Bold">SketchScript</Run>
+                            <LineBreak />
+                            <Run FontStyle="Italic">an animation and visualization playground for Ruby</Run>
+                        </Paragraph>
+                        <Paragraph>
+                            <Run FontWeight="Bold" FontSize="14">Left column: the "canvas"</Run>
+                            <LineBreak />
+                            The canvas is where you make art. It is an actual
+                            <Hyperlink NavigateUri="http://msdn.microsoft.com/en-us/library/system.windows.controls.canvas(VS.100).aspx" RequestNavigate="Hyperlink_RequestNavigate">canvas object</Hyperlink>,
+                            so things can be added to it, mouse-clicks captured, etc.
+                        </Paragraph>
+                        <Paragraph>
+                            <Run FontWeight="Bold" FontSize="14">Right column: the "editor"</Run>
+                            <LineBreak />
+                            The editor lets you manage the code running your animations. The
+                            <Run FontStyle="Italic">Interactive</Run> tab lets you actually
+                            run the entire buffer by pressing <Run FontWeight="Black">Ctrl-C</Run>.
+                            You can run less than that by selecting the code you want to run and
+                            also pressing <Run FontWeight="Black">Ctrl-C</Run>.
+                        </Paragraph>
+                        <Paragraph>
+                            When the code runs, the result will be shown in the output window
+                            below the editor. Also, the <Run FontStyle="Italic">History</Run>
+                            tab shows you a record of all the code that has run in your session,
+                            so you easily recreate the state.
+                        </Paragraph>
+                        <Paragraph>
+                            Also, the editor and output window are all resizable, so if you can't
+                            see a part of the UI, try dragging things around.
+                        </Paragraph>
+                    </FlowDocument>
+                </RichTextBox>
+            </TabItem>
         </TabControl>
         <GridSplitter x:Name="_consoleSplitter" 
                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
