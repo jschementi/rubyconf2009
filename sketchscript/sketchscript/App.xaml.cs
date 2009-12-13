@@ -4,7 +4,6 @@ using System.Configuration;
 using System.Data;
 using System.Linq;
 using System.Windows;
-using Microsoft.Scripting.Hosting;
 
 namespace SketchScript
 {
@@ -16,7 +15,10 @@ namespace SketchScript
             this.DispatcherUnhandledException += (s, a) => {
                 a.Handled = true;
                 MainWindow w = (MainWindow) this.MainWindow;
-                string formattedEx = w._scripting.Runtime.GetEngine("ruby").GetService<ExceptionOperations>().FormatException(a.Exception);
+
+                // TODO: format an exception properly
+                string formattedEx = a.Exception.ToString();
+                
                 System.Windows.MessageBox.Show(formattedEx);
             };
         }
