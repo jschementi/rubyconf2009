@@ -17,6 +17,8 @@ using System.IO;
 using AeroGlass;
 using System.Diagnostics;
 using SThread = System.Threading;
+using Microsoft.Scripting.Hosting;
+using IronRuby;
 
 namespace SketchScript {
 
@@ -73,7 +75,19 @@ namespace SketchScript {
         public void RunCode(TextBox t) {
             string code = t.SelectionLength > 0 ? t.SelectedText : t.Text;
 
-            // TODO: run code!
+            // Initialize IronRuby
+            var runtime = ScriptRuntime.CreateFromConfiguration();
+            var engine = Ruby.GetEngine(runtime);
+            var context = Ruby.GetExecutionContext(engine);
+
+            // redirect stdout to the output window
+            context.StandardOutput = OutputBuffer;
+
+            // Run the code
+            var result = engine.Execute(code);
+
+            // write the result to the output window
+            OutputBuffer.write(string.Format("=> {0}\n", context.Inspect(result)));
         }
 
         /// <summary>
