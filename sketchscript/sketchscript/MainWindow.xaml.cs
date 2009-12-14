@@ -28,6 +28,10 @@ namespace SketchScript {
         public TextBoxBuffer OutputBuffer { get; internal set; }
         private bool _isCtrlPressed;
         private bool _isOutputRedirected;
+
+        private ScriptEngine _rubyEngine;
+        private IronRuby.Runtime.RubyContext _rubyContext;
+        private ScriptScope _scope;
         #endregion
 
         #region Animations
@@ -63,6 +67,16 @@ namespace SketchScript {
 
             this.Loaded += (s,e) => {
                 OutputBuffer = new TextBoxBuffer(_output);
+
+                // Initialize IronRuby
+                var runtime = ScriptRuntime.CreateFromConfiguration();
+                _rubyEngine = Ruby.GetEngine(runtime);
+                _rubyContext = Ruby.GetExecutionContext(_rubyEngine);
+                _scope = _rubyEngine.CreateScope();
+
+                // redirect stdout to the output window
+                _rubyContext.StandardOutput = OutputBuffer;
+
                 KeyBindings();
             };
         }
@@ -75,19 +89,11 @@ namespace SketchScript {
         public void RunCode(TextBox t) {
             string code = t.SelectionLength > 0 ? t.SelectedText : t.Text;
 
-            // Initialize IronRuby
-            var runtime = ScriptRuntime.CreateFromConfiguration();
-            var engine = Ruby.GetEngine(runtime);
-            var context = Ruby.GetExecutionContext(engine);
-
-            // redirect stdout to the output window
-            context.StandardOutput = OutputBuffer;
-
             // Run the code
-            var result = engine.Execute(code);
+            var result = _rubyEngine.Execute(code, _scope);
 
             // write the result to the output window
-            OutputBuffer.write(string.Format("=> {0}\n", context.Inspect(result)));
+            OutputBuffer.write(string.Format("=> {0}\n", _rubyContext.Inspect(result)));
         }
 
         /// <summary>
