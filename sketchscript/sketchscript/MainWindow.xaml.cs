@@ -31,7 +31,7 @@ namespace SketchScript {
 
         private ScriptEngine _rubyEngine;
         private IronRuby.Runtime.RubyContext _rubyContext;
-        private ScriptScope _scope;
+        private dynamic _scope;
         #endregion
 
         #region Animations
@@ -93,7 +93,12 @@ namespace SketchScript {
             var result = _rubyEngine.Execute(code, _scope);
 
             // write the result to the output window
-            OutputBuffer.write(string.Format("=> {0}\n", _rubyContext.Inspect(result)));
+
+            var output = string.Format("=> {0}\n", _rubyContext.Inspect(result));
+            OutputBuffer.write(output);
+
+            // add the code to the history
+            _history.AppendText(string.Format("{0}\n# {1}", code, output));
         }
 
         /// <summary>
