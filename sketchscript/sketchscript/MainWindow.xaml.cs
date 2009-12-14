@@ -23,7 +23,7 @@ namespace SketchScript {
     public partial class MainWindow : Window {
 
         #region Running code
-        public TextBoxBuffer TextBoxBuffer { get; internal set; }
+        public TextBoxBuffer OutputBuffer { get; internal set; }
         private bool _isCtrlPressed;
         private bool _isOutputRedirected;
         #endregion
@@ -60,6 +60,7 @@ namespace SketchScript {
             };
 
             this.Loaded += (s,e) => {
+                OutputBuffer = new TextBoxBuffer(_output);
                 KeyBindings();
             };
         }
@@ -71,6 +72,7 @@ namespace SketchScript {
         /// <param name="t"></param>
         public void RunCode(TextBox t) {
             string code = t.SelectionLength > 0 ? t.SelectedText : t.Text;
+
             // TODO: run code!
         }
 
@@ -125,7 +127,7 @@ namespace SketchScript {
                     catch (Exception e) {
                         EachFrame = null;
                         EachObject = null;
-                        TextBoxBuffer.write("Error during callback: " + e.ToString());
+                        OutputBuffer.write("Error during callback: " + e.ToString());
                         _timer.Stop();
                         _areCallbacksRegistered = false;
                     }
@@ -184,7 +186,7 @@ namespace SketchScript {
 
         private void RedirectOutput() {
             if (!_isOutputRedirected) {
-                TextBoxBuffer = new TextBoxBuffer(Output);
+                OutputBuffer = new TextBoxBuffer(Output);
                 // TODO: tell IronRuby to use _window.TextBoxBuffer for output redirection
                 _isOutputRedirected = true;
             }
@@ -209,10 +211,12 @@ namespace SketchScript {
     /// Simple TextBox Buffer class
     /// </summary>
     public class TextBoxBuffer {
-        TextBox box;
+        private TextBox box;
+
         public TextBoxBuffer(TextBox t) {
             box = t;
         }
+
         public void write(string str) {
             box.Dispatcher.BeginInvoke((Action) (() => {
                 box.AppendText(str);
