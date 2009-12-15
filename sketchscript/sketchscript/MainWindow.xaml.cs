@@ -27,9 +27,9 @@ namespace SketchScript {
         #region Running code
         public TextBoxBuffer OutputBuffer { get; internal set; }
         private bool _isCtrlPressed;
-        private bool _isOutputRedirected;
 
         private ScriptEngine _rubyEngine;
+        public ScriptEngine RubyEngine { get { return _rubyEngine; } }
         private IronRuby.Runtime.RubyContext _rubyContext;
         private ScriptScope _scope;
         #endregion
@@ -66,6 +66,43 @@ namespace SketchScript {
             };
 
             this.Loaded += (s,e) => {
+                #region Wecome Text
+                _code.Text = @"# Welcome to SketchScript!
+
+# All Ruby code typed here can be run by pressing
+# Ctrl-Enter. If you don't want to run everything,
+# just select the text you wan to run and press
+# the same key combination.
+
+# This is nothing more than a Ruby interpreter:
+# Try the following; it will print to the output
+# window below the code:
+
+10.times{|i| puts i * i}
+
+# basic.rb will reset this environment for some
+# cool demos:
+
+require 'basic'
+
+# Check out the About tab for more information.
+
+#
+# Need to make fonts bigger for a demo?
+#
+DEMO = true
+window.font_size = 16
+window.width = 1024
+window.height = 600
+window.code.font_size = 18
+window.history.font_size = 16
+window.output.font_size = 18
+window.find_name('_tabs').items.each do |i|
+  i.font_size = 16
+end
+window.output.clear";
+                #endregion
+
                 OutputBuffer = new TextBoxBuffer(_output);
 
                 // Initialize IronRuby
@@ -77,9 +114,13 @@ namespace SketchScript {
                 runtime.LoadAssembly(typeof(Canvas).Assembly);  // loads PresentationFramework
                 runtime.LoadAssembly(typeof(Brushes).Assembly); // loads PresentationCore
                 runtime.LoadAssembly(GetType().Assembly);       // loads this exe
+
                 dynamic scope = _scope;
                 scope.canvas = _canvas;
                 scope.window = this;
+
+                // Cute little trick: warm up the Ruby engine by running some code on another thread:
+                new SThread.Thread(new SThread.ThreadStart(() => _rubyEngine.Execute("2 + 2", _scope))).Start();
 
                 // redirect stdout to the output window
                 _rubyContext.StandardOutput = OutputBuffer;
@@ -102,7 +143,6 @@ namespace SketchScript {
             var result = _rubyEngine.Execute(code, _scope);
 
             // write the result to the output window
-
             var output = string.Format("=> {0}\n", _rubyContext.Inspect(result));
             OutputBuffer.write(output);
 
@@ -132,6 +172,8 @@ namespace SketchScript {
         /// properties placed on the canvas's children.
         /// </summary>
         public void ClearAnimations() {
+            _scope.RemoveVariable("each_frame");
+            _scope.RemoveVariable("each_object");
             EachFrame = null;
             EachObject = null;
             foreach (UIElement element in _canvas.Children) {
@@ -217,16 +259,10 @@ namespace SketchScript {
 
                     if (eachObject != null) {
                         eachObject.update(element);
+                        // Note: if "tracker" was not dynamic, or not a IObjectUpdater, then you'd have to write this:
+                        // _rubyEngine.Operations.InvokeMember(eachFrameAndObject, "update", element);
                     }
                 }
-            }
-        }
-
-        private void RedirectOutput() {
-            if (!_isOutputRedirected) {
-                OutputBuffer = new TextBoxBuffer(Output);
-                // TODO: tell IronRuby to use _window.TextBoxBuffer for output redirection
-                _isOutputRedirected = true;
             }
         }
 

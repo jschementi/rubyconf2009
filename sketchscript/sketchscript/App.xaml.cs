@@ -4,6 +4,7 @@ using System.Configuration;
 using System.Data;
 using System.Linq;
 using System.Windows;
+using Microsoft.Scripting.Hosting;
 
 namespace SketchScript
 {
@@ -16,9 +17,8 @@ namespace SketchScript
                 a.Handled = true;
                 MainWindow w = (MainWindow) this.MainWindow;
 
-                // TODO: format an exception properly
-                string formattedEx = a.Exception.ToString();
-                
+                string formattedEx = w.RubyEngine.GetService<ExceptionOperations>().FormatException(a.Exception);
+
                 System.Windows.MessageBox.Show(formattedEx);
             };
         }
