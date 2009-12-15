@@ -143,12 +143,6 @@ namespace SketchScript {
         /// Grabs a hold of any callbacks defined by user code
         /// </summary>
         internal void CaptureAnimationCallbacks() {
-            EachFrame = null;
-            // TODO: get the "EachFrame" callback
-
-            EachObject = null;
-            // TODO: get the "EachObject" callback
-
             Action eachFrame = null;
             _scope.TryGetVariable<Action>("each_frame", out eachFrame);
             EachFrame = eachFrame;
