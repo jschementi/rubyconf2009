@@ -80,10 +80,10 @@ namespace SketchScript {
 
 10.times{|i| puts i * i}
 
-# basic.rb will reset this environment for some
+# start.rb will reset this environment for some
 # cool demos:
 
-require 'basic'
+require 'start'
 
 # Check out the About tab for more information.
 

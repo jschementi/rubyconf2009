@@ -1,6 +1,6 @@
-# You are viewing basic.rb, which as the name
-# infers, only adds very basic features to 
-# sketchscript. For the cool demos, run:
+# You are viewing start.rb, which only adds 
+# very basic features to sketchscript. 
+# For the cool demos, run:
 #
 # open "interactive.rb"
 
@@ -177,7 +177,7 @@ def setup
 end
 
 def reload
-  load 'basic.rb'
+  load 'start.rb'
 end
 
 def scroll_to_first_selected_line
