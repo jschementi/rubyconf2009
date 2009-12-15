@@ -31,7 +31,7 @@ namespace SketchScript {
 
         private ScriptEngine _rubyEngine;
         private IronRuby.Runtime.RubyContext _rubyContext;
-        private dynamic _scope;
+        private ScriptScope _scope;
         #endregion
 
         #region Animations
@@ -74,8 +74,17 @@ namespace SketchScript {
                 _rubyContext = Ruby.GetExecutionContext(_rubyEngine);
                 _scope = _rubyEngine.CreateScope();
 
+                runtime.LoadAssembly(typeof(Canvas).Assembly);  // loads PresentationFramework
+                runtime.LoadAssembly(typeof(Brushes).Assembly); // loads PresentationCore
+                runtime.LoadAssembly(GetType().Assembly);       // loads this exe
+                dynamic scope = _scope;
+                scope.canvas = _canvas;
+                scope.window = this;
+
                 // redirect stdout to the output window
                 _rubyContext.StandardOutput = OutputBuffer;
+
+                RegisterCallbacks();
 
                 KeyBindings();
             };
@@ -99,6 +108,8 @@ namespace SketchScript {
 
             // add the code to the history
             _history.AppendText(string.Format("{0}\n# {1}", code, output));
+
+            CaptureAnimationCallbacks();
         }
 
         /// <summary>
@@ -137,6 +148,14 @@ namespace SketchScript {
 
             EachObject = null;
             // TODO: get the "EachObject" callback
+
+            Action eachFrame = null;
+            _scope.TryGetVariable<Action>("each_frame", out eachFrame);
+            EachFrame = eachFrame;
+
+            Func<object, dynamic> eachObject = null;
+            _scope.TryGetVariable<Func<object, dynamic>>("each_object", out eachObject);
+            EachObject = eachObject;
         }
 
         /// <summary>
