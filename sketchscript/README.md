@@ -4,7 +4,7 @@ An animation and visualization playground for Ruby
 
 Left column: the "canvas"
 -------------------------
-The canvas is where you make art. It is an [actual canvas](http://msdn.microsoft.com/en-us/library/system.windows.controls.canvas\(VS.100\).aspx) object, so things can be added to it, mouse-clicks captured, etc.
+The canvas is where you make art. It is an actual canvas object, so things can be added to it, mouse-clicks captured, etc.
 
 Right column: the "editor"
 --------------------------
