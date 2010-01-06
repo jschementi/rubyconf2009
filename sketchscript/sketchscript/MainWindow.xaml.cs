@@ -38,7 +38,7 @@ namespace SketchScript {
         public Action EachFrame { get; internal set; }
         public Func<object,
 #if CLR2
-            IObjectUpdater
+            object
 #else
             dynamic
 #endif
@@ -115,9 +115,14 @@ window.output.clear";
                 runtime.LoadAssembly(typeof(Brushes).Assembly); // loads PresentationCore
                 runtime.LoadAssembly(GetType().Assembly);       // loads this exe
 
+#if CLR2
+                _scope.SetVariable("canvas", _canvas);
+                _scope.SetVariable("window", this);
+#else
                 dynamic scope = _scope;
                 scope.canvas = _canvas;
                 scope.window = this;
+#endif
 
                 // Cute little trick: warm up the Ruby engine by running some code on another thread:
                 new SThread.Thread(new SThread.ThreadStart(() => _rubyEngine.Execute("2 + 2", _scope))).Start();
@@ -189,8 +194,20 @@ window.output.clear";
             _scope.TryGetVariable<Action>("each_frame", out eachFrame);
             EachFrame = eachFrame;
 
-            Func<object, dynamic> eachObject = null;
-            _scope.TryGetVariable<Func<object, dynamic>>("each_object", out eachObject);
+            Func<object, 
+#if CLR2
+                object
+#else
+                dynamic
+#endif
+                > eachObject = null;
+            _scope.TryGetVariable<Func<object, 
+#if CLR2
+                object
+#else
+                dynamic
+#endif
+                >>("each_object", out eachObject);
             EachObject = eachObject;
         }
 
@@ -212,7 +229,7 @@ window.output.clear";
                         _areCallbacksRegistered = false;
                     }
                 }));
-                _timer.Interval = 1000 / 30;
+                _timer.Interval = 1000 / 1;
                 _timer.Start();
                 _areCallbacksRegistered = true;
             }
@@ -248,7 +265,7 @@ window.output.clear";
             if (EachObject != null) {
                 foreach (UIElement element in _canvas.Children) {
 #if CLR2
-                    IObjectUpdater eachObject = element.GetValue(EachObjectProperty) as IObjectUpdater;
+                    object eachObject = element.GetValue(EachObjectProperty);
 #else
                     dynamic eachObject = element.GetValue(EachObjectProperty);
 #endif
@@ -258,9 +275,15 @@ window.output.clear";
                     }
 
                     if (eachObject != null) {
+#if !CLR2                      
                         eachObject.update(element);
-                        // Note: if "tracker" was not dynamic, or not a IObjectUpdater, then you'd have to write this:
-                        // _rubyEngine.Operations.InvokeMember(eachFrameAndObject, "update", element);
+#else
+                        if ((eachObject as IObjectUpdater) != null) {
+                            (eachObject as IObjectUpdater).update(element);
+                        } else {
+                            _rubyEngine.Operations.InvokeMember(eachObject, "update", element);
+                        }
+#endif
                     }
                 }
             }
